@@ -1,0 +1,33 @@
+name: interact
+version: 0.1.0.0
+#synopsis:
+#description:
+homepage: https://github.com/epoberezkin/interact#readme
+license: MIT
+author: Evgeny Poberezkin
+maintainer: evgeny@poberezkin.com
+copyright: 2020 Evgeny Poberezkin
+category: Repl
+extra-source-files:
+  - README.md
+
+dependencies:
+  - base >= 4.7 && < 5
+  - mtl
+
+library:
+  source-dirs: src
+
+executables:
+  main:
+    source-dirs: src
+    main: Main.hs
+    dependencies: interact
+
+ghc-options:
+  - -Wall
+  - -Wcompat
+  - -Werror=incomplete-patterns
+  - -Wredundant-constraints
+  - -Wincomplete-record-updates
+  - -Wincomplete-uni-patterns

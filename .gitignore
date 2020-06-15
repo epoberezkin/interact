@@ -1,0 +1,3 @@
+*.lock
+*.cabal
+.stack-work
