@@ -4,7 +4,7 @@ import Control.Monad.State
 import Interact
 
 main :: IO ()
-main = replFunc double
+main = repl double
 
 -- main = replState adder 0
 

@@ -24,6 +24,17 @@ executables:
     main: Main.hs
     dependencies: interact
 
+tests:
+  interact-test:
+    source-dirs: tests
+    main: Test.hs
+    dependencies:
+      - bytestring
+      - hspec
+      - interact
+      - main-tester
+      - silently
+
 ghc-options:
   - -Wall
   - -Wcompat
