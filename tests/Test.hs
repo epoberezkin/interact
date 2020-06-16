@@ -1,5 +1,6 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 
 import Control.Monad.State
 import Data.ByteString.Char8 (ByteString)
@@ -11,12 +12,16 @@ import Test.Main (withStdin)
 main :: IO ()
 main = hspec do
   describe "repl" do
+    it "[String] -> [String]" $
+      inputLines @-> repl (map doubleString) -># doubledLines
     it "String -> String" $
       inputLines @-> repl doubleString -># doubledLines
     it "String -> Maybe String" $
       inputLines @-> repl maybeDoubleString -># doubledLinesStopped
     it "String -> Either String String" $
       inputLines @-> repl eitherDoubleString -># doubledLinesBye
+    it "[Int] -> [Int]" $
+      inputInts @-> repl (map doubleInt) -># doubledInts
     it "Int -> Int" $
       inputInts @-> repl doubleInt -># doubledInts
     it "Int -> Maybe Int" $
@@ -48,10 +53,18 @@ main = hspec do
       intsToAdd @-> replState' 0 infAdder 0 -># addedIntsStopped
   describe "replFold" do
     it "Int -> Int -> Int" $
-      intsToAdd @-> replFold (+) (0 :: Int) -># addedInts
+      intsToAdd @-> replFold @Int (+) 0
+        -># addedInts
+    it "sums of squares" $
+      intsToAdd @-> replFold @Int (flip ((+) . (^ (2 :: Int)))) 0
+        -># sumsOfSquares
   describe "replFold'" do
     it "0 -> Int -> Int -> Int" $
-      intsToAdd @-> replFold' 0 (+) (0 :: Int) -># addedIntsStopped
+      intsToAdd @-> replFold' @Int 0 (+) 0
+        -># addedIntsStopped
+    it "sums of squares (stopped)" $
+      intsToAdd @-> replFold' @Int 0 (flip ((+) . (^ (2 :: Int)))) 0
+        -># sumsOfSquaresStopped
 
 (@->) :: ByteString -> IO () -> IO ()
 (@->) = withStdin
@@ -107,8 +120,8 @@ doubledIntsBye = "4\n34\nbye\n"
 
 -- samples for replState with String
 
-infAdderStrFunc :: String -> Int -> (Int, String)
-infAdderStrFunc s x = let x' = x + read s in (x', show x')
+infAdderStrFunc :: String -> Int -> (String, Int)
+infAdderStrFunc s y = let y' = y + read s in (show y', y')
 
 infAdderStr :: String -> State Int String
 infAdderStr s = modify (+ read s) >> gets show
@@ -124,7 +137,7 @@ adderStrBye s = case read s of
   x -> modify (+ x) >> gets (Right . show)
 
 infAdderFunc :: Int -> Int -> (Int, Int)
-infAdderFunc y x = let x' = x + y in (x', x')
+infAdderFunc x y = let y' = y + x in (y', y')
 
 infAdder :: Int -> State Int Int
 infAdder x = modify (+ x) >> get
@@ -145,8 +158,14 @@ intsToAdd = "2\n5\n12\n0\n11\n"
 addedInts :: String
 addedInts = "2\n7\n19\n19\n30\n"
 
+sumsOfSquares :: String
+sumsOfSquares = "4\n29\n173\n173\n294\n"
+
 addedIntsStopped :: String
 addedIntsStopped = "2\n7\n19\n"
+
+sumsOfSquaresStopped :: String
+sumsOfSquaresStopped = "4\n29\n173\n"
 
 addedIntsBye :: String
 addedIntsBye = "2\n7\n19\nbye\n"

@@ -7,7 +7,7 @@ license: MIT
 author: Evgeny Poberezkin
 maintainer: evgeny@poberezkin.com
 copyright: 2020 Evgeny Poberezkin
-category: Repl
+category: REPL
 extra-source-files:
   - README.md
 
@@ -17,12 +17,6 @@ dependencies:
 
 library:
   source-dirs: src
-
-executables:
-  main:
-    source-dirs: src
-    main: Main.hs
-    dependencies: interact
 
 tests:
   interact-test:
