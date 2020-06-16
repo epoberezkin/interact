@@ -1,13 +1,13 @@
 name: interact
 version: 0.1.0.0
-#synopsis:
-#description:
+synopsis: Functions to create interactive REPLs.
+description: "DIY REPL: Prelude's 'interact' on steroids. Functions to create interactive REPLs."
 homepage: https://github.com/epoberezkin/interact#readme
 license: MIT
 author: Evgeny Poberezkin
 maintainer: evgeny@poberezkin.com
 copyright: 2020 Evgeny Poberezkin
-category: REPL
+category: System, REPL
 extra-source-files:
   - README.md
 
