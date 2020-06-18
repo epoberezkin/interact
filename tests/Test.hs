@@ -27,19 +27,34 @@ main = hspec do
     it "[Int] -> [Int]" $
       ["2", "17", "0", "123"] #-> repl (map doubleInt)
         -># ["4", "34", "0", "246"]
+    it "[Int] -> [Int] (invalid input)" $
+      ["2", "abc", "17", "0", "123"] #-> repl (map doubleInt)
+        -># ["4", "34", "0", "246"]
     it "Int -> Int" $
       ["2", "17", "0", "123"] #-> repl doubleInt
         -># ["4", "34", "0", "246"]
+    it "Int -> Int (invalid input)" $
+      ["2", "abc", "17", "0", "123"] #-> repl doubleInt
+        -># ["4", "Invalid input", "34", "0", "246"]
     it "Int -> Maybe Int" $
       ["2", "17", "0", "123"] #-> repl maybeDoubleInt
         -># ["4", "34"]
+    it "Int -> Maybe Int (invalid input) " $
+      ["2", "abc", "17", "0", "123"] #-> repl maybeDoubleInt
+        -># ["4", "Invalid input", "34"]
     it "Int -> Either String Int" $
       ["2", "17", "0", "123"] #-> repl eitherDoubleInt
         -># ["4", "34", "bye"]
+    it "Int -> Either String Int (invalid input)" $
+      ["2", "abc", "17", "0", "123"] #-> repl eitherDoubleInt
+        -># ["4", "Invalid input", "34", "bye"]
   describe "repl'" do
     it "0 -> Int -> Int" $
       ["2", "17", "0", "123"] #-> repl' 0 doubleInt
         -># ["4", "34"]
+    it "0 -> Int -> Int (invalid input)" $
+      ["2", "abc", "17", "0", "123"] #-> repl' 0 doubleInt
+        -># ["4", "Invalid input", "34"]
   describe "replState" do
     it "String -> Int -> (Int, String)" $
       ["2", "5", "12", "0", "11"] #-> replState infAdderStrFunc 0
@@ -56,23 +71,41 @@ main = hspec do
     it "Int -> Int -> (Int, Int)" $
       ["2", "5", "12", "0", "11"] #-> replState infAdderFunc 0
         -># ["2", "7", "19", "19", "30"]
+    it "Int -> Int -> (Int, Int) (invlid input)" $
+      ["2", "abc", "5", "12", "0", "11"] #-> replState infAdderFunc 0
+        -># ["2", "Invalid input", "7", "19", "19", "30"]
     it "Int -> State Int Int" $
       ["2", "5", "12", "0", "11"] #-> replState infAdder 0
         -># ["2", "7", "19", "19", "30"]
+    it "Int -> State Int Int (invalid input)" $
+      ["2", "abc", "5", "12", "0", "11"] #-> replState infAdder 0
+        -># ["2", "Invalid input", "7", "19", "19", "30"]
     it "Int -> State Int (Maybe Int)" $
       ["2", "5", "12", "0", "11"] #-> replState adder 0
         -># ["2", "7", "19"]
+    it "Int -> State Int (Maybe Int) (invalid input)" $
+      ["2", "abc", "5", "12", "0", "11"] #-> replState adder 0
+        -># ["2", "Invalid input", "7", "19"]
     it "Int -> State Int (Either String Int)" $
       ["2", "5", "12", "0", "11"] #-> replState adderBye 0
         -># ["2", "7", "19", "bye"]
+    it "Int -> State Int (Either String Int) (invalid input)" $
+      ["2", "abc", "5", "12", "0", "11"] #-> replState adderBye 0
+        -># ["2", "Invalid input", "7", "19", "bye"]
   describe "replState'" do
     it "0 -> Int -> State Int Int" $
       ["2", "5", "12", "0", "11"] #-> replState' 0 infAdder 0
         -># ["2", "7", "19"]
+    it "0 -> Int -> State Int Int (invalid input)" $
+      ["2", "abc", "5", "12", "0", "11"] #-> replState' 0 infAdder 0
+        -># ["2", "Invalid input", "7", "19"]
   describe "replFold" do
     it "Int -> Int -> Int" $
       ["2", "5", "12", "0", "11"] #-> replFold @Int (+) 0
         -># ["2", "7", "19", "19", "30"]
+    it "Int -> Int -> Int (invalid input)" $
+      ["2", "abc", "5", "12", "0", "11"] #-> replFold @Int (+) 0
+        -># ["2", "Invalid input", "7", "19", "19", "30"]
     it "sums of squares" $
       ["2", "5", "12", "0", "11"] #-> replFold @Int (flip ((+) . (^ (2 :: Int)))) 0
         -># ["4", "29", "173", "173", "294"]
@@ -80,6 +113,9 @@ main = hspec do
     it "0 -> Int -> Int -> Int" $
       ["2", "5", "12", "0", "11"] #-> replFold' @Int 0 (+) 0
         -># ["2", "7", "19"]
+    it "0 -> Int -> Int -> Int (invalid input)" $
+      ["2", "abc", "5", "12", "0", "11"] #-> replFold' @Int 0 (+) 0
+        -># ["2", "Invalid input", "7", "19"]
     it "sums of squares (stopped)" $
       ["2", "5", "12", "0", "11"] #-> replFold' @Int 0 (flip ((+) . (^ (2 :: Int)))) 0
         -># ["4", "29", "173"]

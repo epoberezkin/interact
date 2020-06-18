@@ -3,7 +3,6 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ViewPatterns #-}
 
 -- |
 -- Module      : Interact
@@ -69,12 +68,15 @@ instance {-# OVERLAPPING #-} Interact [String] [String] where
 -- | 'stdin'/'stdout' values as lazy lists
 instance {-# OVERLAPPING #-} (Read a, Show b) => Interact [a] [b] where
   repl :: ([a] -> [b]) -> IO ()
-  repl f = repl $ map show . f . map read
+  repl f = repl $ map show . f . mapMaybe readMaybe
 
 -- | Ctrl-D to exit
 instance (Read a, Show b) => Interact a b where
   repl :: (a -> b) -> IO ()
-  repl f = repl (maybe "Invalid input" show . fmap f . readMaybe)
+  repl f = repl (maybe invalid show . fmap f . readMaybe)
+
+invalid :: String
+invalid = "Invalid input"
 
 -- | 'String's do not use 'read'/'show'
 instance {-# OVERLAPPING #-} Interact String String where
@@ -102,12 +104,16 @@ whileRight = rights . rightsAndLeft . span isRight
 -- | return 'Nothing' to exit
 instance {-# OVERLAPPING #-} (Read a, Show b) => Interact a (Maybe b) where
   repl :: (a -> Maybe b) -> IO ()
-  repl f = repl (fmap show . f . read)
+  repl f = repl f'
+    where
+      f' = maybe (Just invalid) (fmap show) . fmap f . readMaybe
 
 -- | return 'Left' to exit, string in 'Left' is printed
 instance {-# OVERLAPPING #-} (Read a, Show b) => Interact a (Either String b) where
   repl :: (a -> Either String b) -> IO ()
-  repl f = repl (fmap show . f . read)
+  repl f = repl f'
+    where
+      f' = maybe (Right invalid) (fmap show) . fmap f . readMaybe
 
 -- | Same as 'repl' with @(a -> b)@ function but the first argument is
 -- the value that will cause 'repl'' to exit.
@@ -115,9 +121,11 @@ repl' :: (Eq a, Read a, Show b) => a -> (a -> b) -> IO ()
 repl' stop f = repl f'
   where
     f' :: String -> Maybe String
-    f' (read -> x)
-      | x == stop = Nothing
-      | otherwise = Just . show $ f x
+    f' s = case readMaybe s of
+      Nothing -> Just invalid
+      Just x
+        | x == stop -> Nothing
+        | otherwise -> Just . show $ f x
 
 -- | 'InteractState' typeclass with polymorphic stateful function 'replState'
 -- to interactively evaluate input lines and print responses (see below).
@@ -163,9 +171,11 @@ instance (Read a, Show b) => InteractState a (s -> (b, s)) s where
   replState :: (a -> s -> (b, s)) -> s -> IO ()
   replState f = replState f'
     where
-      f' s st =
-        let (x, st') = f (read s) st
-         in (show x, st')
+      f' s st = case readMaybe s of
+        Just x ->
+          let (x', st') = f x st
+           in (show x', st')
+        Nothing -> (invalid, st)
 
 -- | 'stdin'/'stdout' 'String's as lazy lists
 instance {-# OVERLAPPING #-} InteractState [String] (State s [String]) s where
@@ -177,7 +187,7 @@ instance {-# OVERLAPPING #-} InteractState [String] (State s [String]) s where
 -- | Ctrl-D to exit
 instance (Read a, Show b) => InteractState a (State s b) s where
   replState :: (a -> State s b) -> s -> IO ()
-  replState f = replState $ fmap show . f . read
+  replState f = replState $ maybe (pure invalid) (fmap show) . fmap f . readMaybe
 
 -- | 'String's do not use 'read'/'show'
 instance {-# OVERLAPPING #-} InteractState String (State s String) s where
@@ -195,12 +205,12 @@ instance {-# OVERLAPPING #-} InteractState String (State s (Either String String
 -- | return 'Nothing' to exit
 instance {-# OVERLAPPING #-} (Read a, Show b) => InteractState a (State s (Maybe b)) s where
   replState :: (a -> State s (Maybe b)) -> s -> IO ()
-  replState f = replState $ fmap (fmap show) . f . read
+  replState f = replState $ maybe (pure $ Just invalid) (fmap $ fmap show) . fmap f . readMaybe
 
 -- | return 'Left' to exit, string in 'Left' is printed
 instance {-# OVERLAPPING #-} (Read a, Show b) => InteractState a (State s (Either String b)) s where
   replState :: (a -> State s (Either String b)) -> s -> IO ()
-  replState f = replState $ fmap (fmap show) . f . read
+  replState f = replState $ maybe (pure $ Right invalid) (fmap $ fmap show) . fmap f . readMaybe
 
 -- | Same as 'replState' with @(a -> State s b)@ function but the first
 -- argument is the value that will cause 'replState'' to exit.
@@ -209,9 +219,11 @@ replState' ::
 replState' stop f = replState f'
   where
     f' :: String -> State s (Maybe String)
-    f' (read -> x)
-      | x == stop = pure Nothing
-      | otherwise = Just . show <$> f x
+    f' s = case readMaybe s of
+      Nothing -> pure $ Just invalid
+      Just x
+        | x == stop -> pure Nothing
+        | otherwise -> Just . show <$> f x
 
 -- | 'replFold' combines the entered values with the accumulated value using
 -- provided function and prints the resulting values.
@@ -220,7 +232,9 @@ replFold ::
 replFold f = replState f'
   where
     f' :: String -> b -> (String, b)
-    f' (read -> x) y = let y' = f y x in (show y', y')
+    f' s y = case readMaybe s of
+      Nothing -> (invalid, y)
+      Just x -> let y' = f y x in (show y', y')
 
 -- | Same as 'replFold' but the first argument is the value that will cause
 -- 'replFold'' to exit.
