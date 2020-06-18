@@ -17,7 +17,7 @@
 -- DIY REPL: Prelude's 'interact' on steroids
 --
 -- Functions to create interactive REPLs.
-module Interact
+module System.IO.Interact
   ( -- * Stateless REPLs
     Interact,
     repl,
@@ -37,6 +37,7 @@ where
 import Control.Monad.State
 import Data.Either
 import Data.Maybe
+import Text.Read (readMaybe)
 
 -- | 'Interact' typeclass with polymorphic stateless function 'repl' to interactively
 -- evaluate input lines and print responses (see below).
@@ -73,7 +74,7 @@ instance {-# OVERLAPPING #-} (Read a, Show b) => Interact [a] [b] where
 -- | Ctrl-D to exit
 instance (Read a, Show b) => Interact a b where
   repl :: (a -> b) -> IO ()
-  repl f = repl (show . f . read)
+  repl f = repl (maybe "Invalid input" show . fmap f . readMaybe)
 
 -- | 'String's do not use 'read'/'show'
 instance {-# OVERLAPPING #-} Interact String String where

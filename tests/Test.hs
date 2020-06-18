@@ -3,8 +3,8 @@
 {-# LANGUAGE TypeApplications #-}
 
 import Control.Monad.State
-import Data.ByteString.Char8 (ByteString)
-import Interact
+import Data.ByteString.Char8 (pack)
+import System.IO.Interact
 import System.IO.Silently (capture_)
 import Test.Hspec
 import Test.Main (withStdin)
@@ -13,66 +13,82 @@ main :: IO ()
 main = hspec do
   describe "repl" do
     it "[String] -> [String]" $
-      inputLines @-> repl (map doubleString) -># doubledLines
+      ["ab", "cdf", "", "efgh"] #-> repl (map doubleString)
+        -># ["abab", "cdfcdf", "", "efghefgh"]
     it "String -> String" $
-      inputLines @-> repl doubleString -># doubledLines
+      ["ab", "cdf", "", "efgh"] #-> repl doubleString
+        -># ["abab", "cdfcdf", "", "efghefgh"]
     it "String -> Maybe String" $
-      inputLines @-> repl maybeDoubleString -># doubledLinesStopped
+      ["ab", "cdf", "", "efgh"] #-> repl maybeDoubleString
+        -># ["abab", "cdfcdf"]
     it "String -> Either String String" $
-      inputLines @-> repl eitherDoubleString -># doubledLinesBye
+      ["ab", "cdf", "", "efgh"] #-> repl eitherDoubleString
+        -># ["abab", "cdfcdf", "bye"]
     it "[Int] -> [Int]" $
-      inputInts @-> repl (map doubleInt) -># doubledInts
+      ["2", "17", "0", "123"] #-> repl (map doubleInt)
+        -># ["4", "34", "0", "246"]
     it "Int -> Int" $
-      inputInts @-> repl doubleInt -># doubledInts
+      ["2", "17", "0", "123"] #-> repl doubleInt
+        -># ["4", "34", "0", "246"]
     it "Int -> Maybe Int" $
-      inputInts @-> repl maybeDoubleInt -># doubledIntsStopped
+      ["2", "17", "0", "123"] #-> repl maybeDoubleInt
+        -># ["4", "34"]
     it "Int -> Either String Int" $
-      inputInts @-> repl eitherDoubleInt -># doubledIntsBye
+      ["2", "17", "0", "123"] #-> repl eitherDoubleInt
+        -># ["4", "34", "bye"]
   describe "repl'" do
     it "0 -> Int -> Int" $
-      inputInts @-> repl' 0 doubleInt -># doubledIntsStopped
+      ["2", "17", "0", "123"] #-> repl' 0 doubleInt
+        -># ["4", "34"]
   describe "replState" do
     it "String -> Int -> (Int, String)" $
-      intsToAdd @-> replState infAdderStrFunc 0 -># addedInts
+      ["2", "5", "12", "0", "11"] #-> replState infAdderStrFunc 0
+        -># ["2", "7", "19", "19", "30"]
     it "String -> State Int String" $
-      intsToAdd @-> replState infAdderStr 0 -># addedInts
+      ["2", "5", "12", "0", "11"] #-> replState infAdderStr 0
+        -># ["2", "7", "19", "19", "30"]
     it "String -> State Int (Maybe String)" $
-      intsToAdd @-> replState adderStr 0 -># addedIntsStopped
+      ["2", "5", "12", "0", "11"] #-> replState adderStr 0
+        -># ["2", "7", "19"]
     it "String -> State Int (Either String String)" $
-      intsToAdd @-> replState adderStrBye 0 -># addedIntsBye
+      ["2", "5", "12", "0", "11"] #-> replState adderStrBye 0
+        -># ["2", "7", "19", "bye"]
     it "Int -> Int -> (Int, Int)" $
-      intsToAdd @-> replState infAdderFunc 0 -># addedInts
+      ["2", "5", "12", "0", "11"] #-> replState infAdderFunc 0
+        -># ["2", "7", "19", "19", "30"]
     it "Int -> State Int Int" $
-      intsToAdd @-> replState infAdder 0 -># addedInts
+      ["2", "5", "12", "0", "11"] #-> replState infAdder 0
+        -># ["2", "7", "19", "19", "30"]
     it "Int -> State Int (Maybe Int)" $
-      intsToAdd @-> replState adder 0 -># addedIntsStopped
+      ["2", "5", "12", "0", "11"] #-> replState adder 0
+        -># ["2", "7", "19"]
     it "Int -> State Int (Either String Int)" $
-      intsToAdd @-> replState adderBye 0 -># addedIntsBye
+      ["2", "5", "12", "0", "11"] #-> replState adderBye 0
+        -># ["2", "7", "19", "bye"]
   describe "replState'" do
     it "0 -> Int -> State Int Int" $
-      intsToAdd @-> replState' 0 infAdder 0 -># addedIntsStopped
+      ["2", "5", "12", "0", "11"] #-> replState' 0 infAdder 0
+        -># ["2", "7", "19"]
   describe "replFold" do
     it "Int -> Int -> Int" $
-      intsToAdd @-> replFold @Int (+) 0
-        -># addedInts
+      ["2", "5", "12", "0", "11"] #-> replFold @Int (+) 0
+        -># ["2", "7", "19", "19", "30"]
     it "sums of squares" $
-      intsToAdd @-> replFold @Int (flip ((+) . (^ (2 :: Int)))) 0
-        -># sumsOfSquares
+      ["2", "5", "12", "0", "11"] #-> replFold @Int (flip ((+) . (^ (2 :: Int)))) 0
+        -># ["4", "29", "173", "173", "294"]
   describe "replFold'" do
     it "0 -> Int -> Int -> Int" $
-      intsToAdd @-> replFold' @Int 0 (+) 0
-        -># addedIntsStopped
+      ["2", "5", "12", "0", "11"] #-> replFold' @Int 0 (+) 0
+        -># ["2", "7", "19"]
     it "sums of squares (stopped)" $
-      intsToAdd @-> replFold' @Int 0 (flip ((+) . (^ (2 :: Int)))) 0
-        -># sumsOfSquaresStopped
+      ["2", "5", "12", "0", "11"] #-> replFold' @Int 0 (flip ((+) . (^ (2 :: Int)))) 0
+        -># ["4", "29", "173"]
 
-(@->) :: ByteString -> IO () -> IO ()
-(@->) = withStdin
+(#->) :: [String] -> IO () -> IO ()
+(#->) = withStdin . pack . unlines
 
-(->#) :: IO () -> String -> Expectation
-testedIO -># expected = capture_ testedIO `shouldReturn` expected
-
--- samples for repl with String
+(->#) :: IO () -> [String] -> Expectation
+testedIO -># expected = capture_ testedIO `shouldReturn` unlines expected
 
 doubleString :: String -> String
 doubleString s = s ++ s
@@ -83,20 +99,6 @@ maybeDoubleString s = if null s then Nothing else Just $ s ++ s
 eitherDoubleString :: String -> Either String String
 eitherDoubleString s = if null s then Left "bye" else Right $ s ++ s
 
-inputLines :: ByteString
-inputLines = "ab\ncdf\n\nefgh\n"
-
-doubledLines :: String
-doubledLines = "abab\ncdfcdf\n\nefghefgh\n"
-
-doubledLinesStopped :: String
-doubledLinesStopped = "abab\ncdfcdf\n"
-
-doubledLinesBye :: String
-doubledLinesBye = "abab\ncdfcdf\nbye\n"
-
--- samples for repl with Read/Show instances
-
 doubleInt :: Int -> Int
 doubleInt x = x + x
 
@@ -105,20 +107,6 @@ maybeDoubleInt x = if x == 0 then Nothing else Just $ x + x
 
 eitherDoubleInt :: Int -> Either String Int
 eitherDoubleInt x = if x == 0 then Left "bye" else Right $ x + x
-
-inputInts :: ByteString
-inputInts = "2\n17\n0\n123\n"
-
-doubledInts :: String
-doubledInts = "4\n34\n0\n246\n"
-
-doubledIntsStopped :: String
-doubledIntsStopped = "4\n34\n"
-
-doubledIntsBye :: String
-doubledIntsBye = "4\n34\nbye\n"
-
--- samples for replState with String
 
 infAdderStrFunc :: String -> Int -> (String, Int)
 infAdderStrFunc s y = let y' = y + read s in (show y', y')
@@ -151,21 +139,3 @@ adderBye :: Int -> State Int (Either String Int)
 adderBye x
   | x == 0 = return $ Left "bye"
   | otherwise = modify (+ x) >> gets Right
-
-intsToAdd :: ByteString
-intsToAdd = "2\n5\n12\n0\n11\n"
-
-addedInts :: String
-addedInts = "2\n7\n19\n19\n30\n"
-
-sumsOfSquares :: String
-sumsOfSquares = "4\n29\n173\n173\n294\n"
-
-addedIntsStopped :: String
-addedIntsStopped = "2\n7\n19\n"
-
-sumsOfSquaresStopped :: String
-sumsOfSquaresStopped = "4\n29\n173\n"
-
-addedIntsBye :: String
-addedIntsBye = "2\n7\n19\nbye\n"
