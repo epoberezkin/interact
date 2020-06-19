@@ -13,21 +13,26 @@
 -- Stability   : experimental
 -- Portability : non-portable
 --
--- DIY REPL: Prelude's 'interact' on steroids
+-- This module provides functions to instantly create interactive REPL,
+-- similar to Prelude 'interact' but with line-by-line processing:
 --
--- Functions to create interactive REPLs.
+-- - stateless REPL from a single argument functions
+-- - REPL with state from plain state function or with State monad
+-- - REPL-fold from two-arguments functions, with the accumulator in the first argument
+--
+-- Each line you enter is 'read' into the argument type and sent to the function, with the result printed.
 module System.IO.Interact
-  ( -- * Stateless REPLs
-    Interact,
+  ( -- * Stateless REPL
+    Repl,
     repl,
     repl',
 
-    -- * Stateful REPLs
-    InteractState,
+    -- * REPL with state
+    ReplState,
     replState,
     replState',
 
-    -- * REPL folds
+    -- * REPL-fold
     replFold,
     replFold',
   )
@@ -38,9 +43,9 @@ import Data.Either
 import Data.Maybe
 import Text.Read (readMaybe)
 
--- | 'Interact' typeclass with polymorphic stateless function 'repl' to interactively
+-- | 'Repl' typeclass with polymorphic stateless function 'repl' to interactively
 -- evaluate input lines and print responses (see below).
-class Interact a b where
+class Repl a b where
   -- | Function passed to 'repl' will be called with values from 'stdin'
   -- ('String's or 'Read' instances, one value at a time or as a lazy list
   -- depending on the type of the function) and should return value
@@ -61,36 +66,36 @@ class Interact a b where
   repl :: (a -> b) -> IO ()
 
 -- | 'stdin'/'stdout' 'String's as lazy lists
-instance {-# OVERLAPPING #-} Interact [String] [String] where
+instance {-# OVERLAPPING #-} Repl [String] [String] where
   repl :: ([String] -> [String]) -> IO ()
   repl f = interact $ unlines . f . lines
 
 -- | 'stdin'/'stdout' values as lazy lists
-instance {-# OVERLAPPING #-} (Read a, Show b) => Interact [a] [b] where
+instance {-# OVERLAPPING #-} (Read a, Show b) => Repl [a] [b] where
   repl :: ([a] -> [b]) -> IO ()
   repl f = repl $ map show . f . mapMaybe readMaybe
 
 -- | Ctrl-D to exit
-instance (Read a, Show b) => Interact a b where
+instance (Read a, Show b) => Repl a b where
   repl :: (a -> b) -> IO ()
-  repl f = repl (maybe invalid show . fmap f . readMaybe)
+  repl f = repl $ maybe invalid show . fmap f . readMaybe
 
 invalid :: String
 invalid = "Invalid input"
 
 -- | 'String's do not use 'read'/'show'
-instance {-# OVERLAPPING #-} Interact String String where
+instance {-# OVERLAPPING #-} Repl String String where
   repl :: (String -> String) -> IO ()
   repl f = repl $ map f
 
-instance {-# OVERLAPPING #-} Interact String (Maybe String) where
+instance {-# OVERLAPPING #-} Repl String (Maybe String) where
   repl :: (String -> Maybe String) -> IO ()
   repl f = repl $ whileJust . map f
 
 whileJust :: [Maybe String] -> [String]
 whileJust = map fromJust . takeWhile isJust
 
-instance {-# OVERLAPPING #-} Interact String (Either String String) where
+instance {-# OVERLAPPING #-} Repl String (Either String String) where
   repl :: (String -> Either String String) -> IO ()
   repl f = repl $ whileRight . map f
 
@@ -102,18 +107,17 @@ whileRight = rights . rightsAndLeft . span isRight
     rightsAndLeft (r : rs, ls) = r : rightsAndLeft (rs, ls)
 
 -- | return 'Nothing' to exit
-instance {-# OVERLAPPING #-} (Read a, Show b) => Interact a (Maybe b) where
+instance {-# OVERLAPPING #-} (Read a, Show b) => Repl a (Maybe b) where
   repl :: (a -> Maybe b) -> IO ()
-  repl f = repl f'
-    where
-      f' = maybe (Just invalid) (fmap show) . fmap f . readMaybe
+  repl f = repl $ readShow f
 
 -- | return 'Left' to exit, string in 'Left' is printed
-instance {-# OVERLAPPING #-} (Read a, Show b) => Interact a (Either String b) where
+instance {-# OVERLAPPING #-} (Read a, Show b) => Repl a (Either String b) where
   repl :: (a -> Either String b) -> IO ()
-  repl f = repl f'
-    where
-      f' = maybe (Right invalid) (fmap show) . fmap f . readMaybe
+  repl f = repl $ readShow f
+
+readShow :: (Applicative f, Read a, Show b) => (a -> f b) -> String -> f String
+readShow f = maybe (pure invalid) (fmap show) . fmap f . readMaybe
 
 -- | Same as 'repl' with @(a -> b)@ function but the first argument is
 -- the value that will cause 'repl'' to exit.
@@ -127,9 +131,9 @@ repl' stop f = repl f'
         | x == stop -> Nothing
         | otherwise -> Just . show $ f x
 
--- | 'InteractState' typeclass with polymorphic stateful function 'replState'
+-- | 'ReplState' typeclass with polymorphic stateful function 'replState'
 -- to interactively evaluate input lines and print responses (see below).
-class InteractState a b s | b -> s where
+class ReplState a b s | b -> s where
   -- | Function passed to 'replState' will be called with values from 'stdin'
   -- and previous state (depending on type, via State monad or
   -- as the first argument) and should return value to be printed to 'stdout'
@@ -159,7 +163,7 @@ class InteractState a b s | b -> s where
   replState :: (a -> b) -> s -> IO ()
 
 -- | plain state function with 'String's as argument and result
-instance {-# OVERLAPPING #-} InteractState String (s -> (String, s)) s where
+instance {-# OVERLAPPING #-} ReplState String (s -> (String, s)) s where
   replState :: (String -> s -> (String, s)) -> s -> IO ()
   replState f s0 = repl $ g s0
     where
@@ -167,7 +171,7 @@ instance {-# OVERLAPPING #-} InteractState String (s -> (String, s)) s where
       g s (x : xs) = let (x', s') = f x s in x' : g s' xs
 
 -- | plain state function with argument and result of any 'Read'/'Show' types
-instance (Read a, Show b) => InteractState a (s -> (b, s)) s where
+instance (Read a, Show b) => ReplState a (s -> (b, s)) s where
   replState :: (a -> s -> (b, s)) -> s -> IO ()
   replState f = replState f'
     where
@@ -178,39 +182,43 @@ instance (Read a, Show b) => InteractState a (s -> (b, s)) s where
         Nothing -> (invalid, st)
 
 -- | 'stdin'/'stdout' 'String's as lazy lists
-instance {-# OVERLAPPING #-} InteractState [String] (State s [String]) s where
+instance {-# OVERLAPPING #-} ReplState [String] (State s [String]) s where
   replState :: ([String] -> State s [String]) -> s -> IO ()
   replState f s0 = interact linesWithState
     where
       linesWithState str = unlines $ evalState (f $ lines str) s0
 
 -- | Ctrl-D to exit
-instance (Read a, Show b) => InteractState a (State s b) s where
+instance (Read a, Show b) => ReplState a (State s b) s where
   replState :: (a -> State s b) -> s -> IO ()
-  replState f = replState $ maybe (pure invalid) (fmap show) . fmap f . readMaybe
+  replState f = replState $ readShow f
 
 -- | 'String's do not use 'read'/'show'
-instance {-# OVERLAPPING #-} InteractState String (State s String) s where
+instance {-# OVERLAPPING #-} ReplState String (State s String) s where
   replState :: (String -> State s String) -> s -> IO ()
   replState f = replState @[String] $ mapM f
 
-instance {-# OVERLAPPING #-} InteractState String (State s (Maybe String)) s where
+instance {-# OVERLAPPING #-} ReplState String (State s (Maybe String)) s where
   replState :: (String -> State s (Maybe String)) -> s -> IO ()
   replState f = replState $ fmap whileJust . mapM f
 
-instance {-# OVERLAPPING #-} InteractState String (State s (Either String String)) s where
+instance {-# OVERLAPPING #-} ReplState String (State s (Either String String)) s where
   replState :: (String -> State s (Either String String)) -> s -> IO ()
   replState f = replState $ fmap whileRight . mapM f
 
 -- | return 'Nothing' to exit
-instance {-# OVERLAPPING #-} (Read a, Show b) => InteractState a (State s (Maybe b)) s where
+instance {-# OVERLAPPING #-} (Read a, Show b) => ReplState a (State s (Maybe b)) s where
   replState :: (a -> State s (Maybe b)) -> s -> IO ()
-  replState f = replState $ maybe (pure $ Just invalid) (fmap $ fmap show) . fmap f . readMaybe
+  replState f = replState $ readShow' f
 
 -- | return 'Left' to exit, string in 'Left' is printed
-instance {-# OVERLAPPING #-} (Read a, Show b) => InteractState a (State s (Either String b)) s where
+instance {-# OVERLAPPING #-} (Read a, Show b) => ReplState a (State s (Either String b)) s where
   replState :: (a -> State s (Either String b)) -> s -> IO ()
-  replState f = replState $ maybe (pure $ Right invalid) (fmap $ fmap show) . fmap f . readMaybe
+  replState f = replState $ readShow' f
+
+readShow' ::
+  (Monad f, Read a, Show b) => (a -> State s (f b)) -> String -> State s (f String)
+readShow' f = maybe (pure $ pure invalid) (fmap $ fmap show) . fmap f . readMaybe
 
 -- | Same as 'replState' with @(a -> State s b)@ function but the first
 -- argument is the value that will cause 'replState'' to exit.
