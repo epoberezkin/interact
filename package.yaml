@@ -1,7 +1,15 @@
 name: interact
 version: 0.1.0.0
-synopsis: Functions to create interactive REPLs.
-description: "DIY REPL: Prelude's 'interact' on steroids. Functions to create interactive REPLs."
+synopsis: instantly create REPL from any function
+description: |
+  This module provides functions to create interactive REPLs:
+  .
+  - stateless REPL from a single argument functions
+  - REPL with state from plain state function or with State monad
+  - REPL-fold from two-arguments functions, with the accumulator in the first argument
+  .
+  Each line you enter is 'read' into the argument type and sent to the function, with the result printed
+
 homepage: https://github.com/epoberezkin/interact#readme
 license: MIT
 author: Evgeny Poberezkin
@@ -14,7 +22,7 @@ extra-source-files:
 
 dependencies:
   - base >= 4.7 && < 5
-  - mtl >= 2.2 && < 2.3
+  - mtl == 2.2.*
 
 library:
   source-dirs: src
