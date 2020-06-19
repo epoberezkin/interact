@@ -63,6 +63,13 @@ class Repl a b where
   -- Reverse entered strings:
   --
   -- > repl (reverse :: String -> String)
+  --
+  -- Prints both squares and square roots:
+  --
+  -- > sqrSqrt :: [Double] -> [Double]
+  -- > sqrSqrt [] = []
+  -- > sqrSqrt (x:xs) = x^2 : sqrt x : sqrSqrt xs
+  -- > repl sqrSqrt
   repl :: (a -> b) -> IO ()
 
 -- | 'stdin'/'stdout' 'String's as lazy lists
