@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeApplications #-}
 
 -- |
--- Module      : Interact
+-- Module      : System.IO.Interact
 -- Copyright   : (c) Evgeny Poberezkin
 -- License     : MIT
 --
