@@ -13,7 +13,7 @@ extra-source-files:
 
 dependencies:
   - base >= 4.7 && < 5
-  - mtl
+  - mtl >= 2.2 && < 2.3
 
 library:
   source-dirs: src
@@ -23,11 +23,11 @@ tests:
     source-dirs: tests
     main: Test.hs
     dependencies:
-      - bytestring
-      - hspec
+      - bytestring >= 0.10 && < 0.11
+      - hspec >= 2.7 && < 2.8
       - interact
-      - main-tester
-      - silently
+      - main-tester >= 0.2 && < 0.3
+      - silently >= 1.2 && < 1.3
 
 ghc-options:
   - -Wall
