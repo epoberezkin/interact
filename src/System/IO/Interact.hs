@@ -113,7 +113,29 @@ instance {-# OVERLAPPING #-} (Read a, Show b) => Repl [a] [b] where
 -- | Ctrl-D to exit
 instance (Read a, Show b) => Repl a b where
   pRepl :: String -> (a -> b) -> IO ()
-  pRepl p f = pRepl p $ maybe invalid show . fmap f . readMaybe
+  pRepl p f = pRepl p $ readShow f
+
+readShowFunc ::
+  (Read a, Show b) =>
+  (String -> fs) ->
+  ((b -> String) -> fb -> fs) ->
+  (a -> fb) ->
+  (String -> fs)
+readShowFunc pr fm f = maybe (pr invalid) (fm show) . fmap f . readMaybe
+
+readShow ::
+  (Read a, Show b) => (a -> b) -> (String -> String)
+readShow = readShowFunc id id
+
+readShowA ::
+  (Applicative f, Read a, Show b) => (a -> f b) -> (String -> f String)
+readShowA = readShowFunc pure fmap
+
+readShowAA ::
+  (Applicative g, Applicative f, Read a, Show b) =>
+  (a -> g (f b)) ->
+  (String -> g (f String))
+readShowAA = readShowFunc (pure . pure) (fmap . fmap)
 
 invalid :: String
 invalid = "Invalid input"
@@ -142,15 +164,12 @@ whileRight [] = []
 -- | return 'Nothing' to exit
 instance {-# OVERLAPPING #-} (Read a, Show b) => Repl a (Maybe b) where
   pRepl :: String -> (a -> Maybe b) -> IO ()
-  pRepl p f = pRepl p $ readShow f
+  pRepl p f = pRepl p $ readShowA f
 
 -- | return 'Left' to exit, string in 'Left' is printed
 instance {-# OVERLAPPING #-} (Read a, Show b) => Repl a (Either String b) where
   pRepl :: String -> (a -> Either String b) -> IO ()
-  pRepl p f = pRepl p $ readShow f
-
-readShow :: (Applicative f, Read a, Show b) => (a -> f b) -> String -> f String
-readShow f = maybe (pure invalid) (fmap show) . fmap f . readMaybe
+  pRepl p f = pRepl p $ readShowA f
 
 -- | Same as 'repl' with @(a -> b)@ function but the first argument is
 -- the value that will cause 'repl'' to exit.
@@ -167,7 +186,7 @@ pRepl' ::
   -- | function to transform the input
   (a -> b) ->
   IO ()
-pRepl' p stop f = pRepl p $ readShow f'
+pRepl' p stop f = pRepl p $ readShowA f'
   where
     f' :: a -> Maybe b
     f' x
@@ -238,7 +257,7 @@ instance {-# OVERLAPPING #-} ReplState [String] (State s [String]) s where
 -- | Ctrl-D to exit
 instance (Read a, Show b) => ReplState a (State s b) s where
   pReplState :: String -> (a -> State s b) -> s -> IO ()
-  pReplState p f = pReplState p $ readShow f
+  pReplState p f = pReplState p $ readShowA f
 
 -- | 'String's do not use 'read'/'show'
 instance {-# OVERLAPPING #-} ReplState String (State s String) s where
@@ -258,16 +277,12 @@ instance {-# OVERLAPPING #-} ReplState String (State s (Either String String)) s
 -- | return 'Nothing' to exit
 instance {-# OVERLAPPING #-} (Read a, Show b) => ReplState a (State s (Maybe b)) s where
   pReplState :: String -> (a -> State s (Maybe b)) -> s -> IO ()
-  pReplState p f = pReplState p $ readShow' f
+  pReplState p f = pReplState p $ readShowAA f
 
 -- | return 'Left' to exit, string in 'Left' is printed
 instance {-# OVERLAPPING #-} (Read a, Show b) => ReplState a (State s (Either String b)) s where
   pReplState :: String -> (a -> State s (Either String b)) -> s -> IO ()
-  pReplState p f = pReplState p $ readShow' f
-
-readShow' ::
-  (Applicative f, Read a, Show b) => (a -> State s (f b)) -> String -> State s (f String)
-readShow' f = maybe (pure $ pure invalid) (fmap $ fmap show) . fmap f . readMaybe
+  pReplState p f = pReplState p $ readShowAA f
 
 -- | Same as 'replState' with @(a -> State s b)@ function but the first
 -- argument is the value that will cause 'replState'' to exit.
@@ -288,7 +303,7 @@ pReplState' ::
   -- | initial state
   s ->
   IO ()
-pReplState' p stop f = pReplState p $ readShow' f'
+pReplState' p stop f = pReplState p $ readShowAA f'
   where
     f' :: a -> State s (Maybe b)
     f' x
@@ -309,7 +324,7 @@ replFold = pReplFold ""
 
 -- | 'replFold' with prompt
 pReplFold :: (Read a, Show b) => String -> (b -> a -> b) -> b -> IO ()
-pReplFold p f = pReplState p . readShow $ foldState f
+pReplFold p f = pReplState p . readShowA $ foldState f
 
 foldState :: (b -> a -> b) -> a -> State b b
 foldState f x = modify (`f` x) >> get
