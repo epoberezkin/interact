@@ -1,5 +1,5 @@
 name: interact
-version: 0.1.0.0
+version: 0.2.0.0
 synopsis: instantly create REPL from any function
 description: |
   This module provides functions to create interactive REPLs:
