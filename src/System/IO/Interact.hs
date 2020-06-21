@@ -113,7 +113,7 @@ instance {-# OVERLAPPING #-} (Read a, Show b) => Repl [a] [b] where
 -- | Ctrl-D to exit
 instance (Read a, Show b) => Repl a b where
   pRepl :: String -> (a -> b) -> IO ()
-  pRepl p f = pRepl p $ readShow f
+  pRepl p = pRepl p . readShow
 
 readShowFunc ::
   (Read a, Show b) =>
@@ -143,7 +143,7 @@ invalid = "Invalid input"
 -- | 'String's do not use 'read'/'show'
 instance {-# OVERLAPPING #-} Repl String String where
   pRepl :: String -> (String -> String) -> IO ()
-  pRepl p f = pRepl p $ map f
+  pRepl p = pRepl p . map
 
 instance {-# OVERLAPPING #-} Repl String (Maybe String) where
   pRepl :: String -> (String -> Maybe String) -> IO ()
@@ -164,12 +164,12 @@ whileRight [] = []
 -- | return 'Nothing' to exit
 instance {-# OVERLAPPING #-} (Read a, Show b) => Repl a (Maybe b) where
   pRepl :: String -> (a -> Maybe b) -> IO ()
-  pRepl p f = pRepl p $ readShowA f
+  pRepl p = pRepl p . readShowA
 
 -- | return 'Left' to exit, string in 'Left' is printed
 instance {-# OVERLAPPING #-} (Read a, Show b) => Repl a (Either String b) where
   pRepl :: String -> (a -> Either String b) -> IO ()
-  pRepl p f = pRepl p $ readShowA f
+  pRepl p = pRepl p . readShowA
 
 -- | Same as 'repl' with @(a -> b)@ function but the first argument is
 -- the value that will cause 'repl'' to exit.
@@ -186,12 +186,12 @@ pRepl' ::
   -- | function to transform the input
   (a -> b) ->
   IO ()
-pRepl' p stop f = pRepl p $ readShowA f'
-  where
-    f' :: a -> Maybe b
-    f' x
-      | x == stop = Nothing
-      | otherwise = Just $ f x
+pRepl' p stop = pRepl p . readShowA . checkEq stop
+
+checkEq :: Eq a => a -> (a -> b) -> a -> Maybe b
+checkEq stop f x
+  | x == stop = Nothing
+  | otherwise = Just $ f x
 
 -- | 'ReplState' typeclass with polymorphic stateful function 'replState'
 -- to interactively evaluate input lines and print responses (see below).
@@ -236,18 +236,15 @@ class ReplState a b s | b -> s where
 -- | plain state function with 'String's as argument and result
 instance {-# OVERLAPPING #-} ReplState String (s -> (String, s)) s where
   pReplState :: String -> (String -> s -> (String, s)) -> s -> IO ()
-  pReplState p f = pReplState p f'
-    where
-      f' :: String -> State s String
-      f' = state . f
+  pReplState p = pReplState p . toState
 
 -- | plain state function with argument and result of any 'Read'/'Show' types
 instance (Read a, Show b) => ReplState a (s -> (b, s)) s where
   pReplState :: String -> (a -> s -> (b, s)) -> s -> IO ()
-  pReplState p f = pReplState p f'
-    where
-      f' :: a -> State s b
-      f' = state . f
+  pReplState p = pReplState p . toState
+
+toState :: (a -> s -> (b, s)) -> (a -> State s b)
+toState f = state . f
 
 -- | 'stdin'/'stdout' 'String's as lazy lists
 instance {-# OVERLAPPING #-} ReplState [String] (State s [String]) s where
@@ -257,12 +254,12 @@ instance {-# OVERLAPPING #-} ReplState [String] (State s [String]) s where
 -- | Ctrl-D to exit
 instance (Read a, Show b) => ReplState a (State s b) s where
   pReplState :: String -> (a -> State s b) -> s -> IO ()
-  pReplState p f = pReplState p $ readShowA f
+  pReplState p = pReplState p . readShowA
 
 -- | 'String's do not use 'read'/'show'
 instance {-# OVERLAPPING #-} ReplState String (State s String) s where
   pReplState :: String -> (String -> State s String) -> s -> IO ()
-  pReplState p f = pReplState @[String] p $ mapM f
+  pReplState p = pReplState @[String] p . mapM
 
 instance {-# OVERLAPPING #-} ReplState String (State s (Maybe String)) s where
   pReplState ::
@@ -277,12 +274,12 @@ instance {-# OVERLAPPING #-} ReplState String (State s (Either String String)) s
 -- | return 'Nothing' to exit
 instance {-# OVERLAPPING #-} (Read a, Show b) => ReplState a (State s (Maybe b)) s where
   pReplState :: String -> (a -> State s (Maybe b)) -> s -> IO ()
-  pReplState p f = pReplState p $ readShowAA f
+  pReplState p = pReplState p . readShowAA
 
 -- | return 'Left' to exit, string in 'Left' is printed
 instance {-# OVERLAPPING #-} (Read a, Show b) => ReplState a (State s (Either String b)) s where
   pReplState :: String -> (a -> State s (Either String b)) -> s -> IO ()
-  pReplState p f = pReplState p $ readShowAA f
+  pReplState p = pReplState p . readShowAA
 
 -- | Same as 'replState' with @(a -> State s b)@ function but the first
 -- argument is the value that will cause 'replState'' to exit.
@@ -303,18 +300,9 @@ pReplState' ::
   -- | initial state
   s ->
   IO ()
-pReplState' p stop f = pReplState p $ readShowAA f'
-  where
-    f' :: a -> State s (Maybe b)
-    f' x
-      | x == stop = pure Nothing
-      | otherwise = Just <$> f x
-
--- f' s = case readMaybe s of
---   Nothing -> pure $ pure invalid
---   Just x
---     | x == stop -> pure Nothing
---     | otherwise -> fmap pure . fmap show $ f x
+pReplState' p stop f =
+  pReplState p . readShowAA $
+    sequence . checkEq stop f
 
 -- | 'replFold' combines the entered values with the accumulated value using
 -- provided function and prints the resulting values.
@@ -324,7 +312,7 @@ replFold = pReplFold ""
 
 -- | 'replFold' with prompt
 pReplFold :: (Read a, Show b) => String -> (b -> a -> b) -> b -> IO ()
-pReplFold p f = pReplState p . readShowA $ foldState f
+pReplFold p = pReplState p . readShowA . foldState
 
 foldState :: (b -> a -> b) -> a -> State b b
 foldState f x = modify (`f` x) >> get
@@ -347,4 +335,4 @@ pReplFold' ::
   -- | initial value
   b ->
   IO ()
-pReplFold' p stop f = pReplState' p stop $ foldState f
+pReplFold' p stop = pReplState' p stop . foldState

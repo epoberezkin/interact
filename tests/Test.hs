@@ -119,12 +119,123 @@ main = hspec do
     it "sums of squares (stopped)" $
       ["2", "5", "12", "0", "11"] #-> replFold' @Int 0 (flip ((+) . (^ (2 :: Int)))) 0
         -># ["4", "29", "173"]
+  describe "pRepl" do
+    it "[String] -> [String]" $
+      ["ab", "cdf", "", "efgh"] #-> pRepl ">" (map doubleString)
+        ->># [">abab", ">cdfcdf", ">", ">efghefgh"]
+    it "String -> String" $
+      ["ab", "cdf", "", "efgh"] #-> pRepl ">" doubleString
+        ->># [">abab", ">cdfcdf", ">", ">efghefgh"]
+    it "String -> Maybe String" $
+      ["ab", "cdf", "", "efgh"] #-> pRepl ">" maybeDoubleString
+        ->># [">abab", ">cdfcdf"]
+    it "String -> Either String String" $
+      ["ab", "cdf", "", "efgh"] #-> pRepl ">" eitherDoubleString
+        ->># [">abab", ">cdfcdf", ">bye"]
+    it "[Int] -> [Int]" $
+      ["2", "17", "0", "123"] #-> pRepl ">" (map doubleInt)
+        ->># [">4", ">34", ">0", ">246"]
+    it "[Int] -> [Int] (invalid input)" $
+      ["2", "abc", "17", "0", "123"] #-> pRepl ">" (map doubleInt)
+        ->># [">4", ">34", ">0", ">246"]
+    it "Int -> Int" $
+      ["2", "17", "0", "123"] #-> pRepl ">" doubleInt
+        ->># [">4", ">34", ">0", ">246"]
+    it "Int -> Int (invalid input)" $
+      ["2", "abc", "17", "0", "123"] #-> pRepl ">" doubleInt
+        ->># [">4", ">Invalid input", ">34", ">0", ">246"]
+    it "Int -> Maybe Int" $
+      ["2", "17", "0", "123"] #-> pRepl ">" maybeDoubleInt
+        ->># [">4", ">34"]
+    it "Int -> Maybe Int (invalid input) " $
+      ["2", "abc", "17", "0", "123"] #-> pRepl ">" maybeDoubleInt
+        ->># [">4", ">Invalid input", ">34"]
+    it "Int -> Either String Int" $
+      ["2", "17", "0", "123"] #-> pRepl ">" eitherDoubleInt
+        ->># [">4", ">34", ">bye"]
+    it "Int -> Either String Int (invalid input)" $
+      ["2", "abc", "17", "0", "123"] #-> pRepl ">" eitherDoubleInt
+        ->># [">4", ">Invalid input", ">34", ">bye"]
+  describe "pRepl'" do
+    it "0 -> Int -> Int" $
+      ["2", "17", "0", "123"] #-> pRepl' ">" 0 doubleInt
+        ->># [">4", ">34"]
+    it "0 -> Int -> Int (invalid input)" $
+      ["2", "abc", "17", "0", "123"] #-> pRepl' ">" 0 doubleInt
+        ->># [">4", ">Invalid input", ">34"]
+  describe "pReplState" do
+    it "String -> Int -> (Int, String)" $
+      ["2", "5", "12", "0", "11"] #-> pReplState ">" infAdderStrFunc 0
+        ->># [">2", ">7", ">19", ">19", ">30"]
+    it "String -> State Int String" $
+      ["2", "5", "12", "0", "11"] #-> pReplState ">" infAdderStr 0
+        ->># [">2", ">7", ">19", ">19", ">30"]
+    it "String -> State Int (Maybe String)" $
+      ["2", "5", "12", "0", "11"] #-> pReplState ">" adderStr 0
+        ->># [">2", ">7", ">19"]
+    it "String -> State Int (Either String String)" $
+      ["2", "5", "12", "0", "11"] #-> pReplState ">" adderStrBye 0
+        ->># [">2", ">7", ">19", ">bye"]
+    it "Int -> Int -> (Int, Int)" $
+      ["2", "5", "12", "0", "11"] #-> pReplState ">" infAdderFunc 0
+        ->># [">2", ">7", ">19", ">19", ">30"]
+    it "Int -> Int -> (Int, Int) (invlid input)" $
+      ["2", "abc", "5", "12", "0", "11"] #-> pReplState ">" infAdderFunc 0
+        ->># [">2", ">Invalid input", ">7", ">19", ">19", ">30"]
+    it "Int -> State Int Int" $
+      ["2", "5", "12", "0", "11"] #-> pReplState ">" infAdder 0
+        ->># [">2", ">7", ">19", ">19", ">30"]
+    it "Int -> State Int Int (invalid input)" $
+      ["2", "abc", "5", "12", "0", "11"] #-> pReplState ">" infAdder 0
+        ->># [">2", ">Invalid input", ">7", ">19", ">19", ">30"]
+    it "Int -> State Int (Maybe Int)" $
+      ["2", "5", "12", "0", "11"] #-> pReplState ">" adder 0
+        ->># [">2", ">7", ">19"]
+    it "Int -> State Int (Maybe Int) (invalid input)" $
+      ["2", "abc", "5", "12", "0", "11"] #-> pReplState ">" adder 0
+        ->># [">2", ">Invalid input", ">7", ">19"]
+    it "Int -> State Int (Either String Int)" $
+      ["2", "5", "12", "0", "11"] #-> pReplState ">" adderBye 0
+        ->># [">2", ">7", ">19", ">bye"]
+    it "Int -> State Int (Either String Int) (invalid input)" $
+      ["2", "abc", "5", "12", "0", "11"] #-> pReplState ">" adderBye 0
+        ->># [">2", ">Invalid input", ">7", ">19", ">bye"]
+  describe "pReplState'" do
+    it "0 -> Int -> State Int Int" $
+      ["2", "5", "12", "0", "11"] #-> pReplState' ">" 0 infAdder 0
+        ->># [">2", ">7", ">19"]
+    it "0 -> Int -> State Int Int (invalid input)" $
+      ["2", "abc", "5", "12", "0", "11"] #-> pReplState' ">" 0 infAdder 0
+        ->># [">2", ">Invalid input", ">7", ">19"]
+  describe "pReplFold" do
+    it "Int -> Int -> Int" $
+      ["2", "5", "12", "0", "11"] #-> pReplFold @Int ">" (+) 0
+        ->># [">2", ">7", ">19", ">19", ">30"]
+    it "Int -> Int -> Int (invalid input)" $
+      ["2", "abc", "5", "12", "0", "11"] #-> pReplFold @Int ">" (+) 0
+        ->># [">2", ">Invalid input", ">7", ">19", ">19", ">30"]
+    it "sums of squares" $
+      ["2", "5", "12", "0", "11"] #-> pReplFold @Int ">" (flip ((+) . (^ (2 :: Int)))) 0
+        ->># [">4", ">29", ">173", ">173", ">294"]
+  describe "pReplFold'" do
+    it "0 -> Int -> Int -> Int" $
+      ["2", "5", "12", "0", "11"] #-> pReplFold' @Int ">" 0 (+) 0
+        ->># [">2", ">7", ">19"]
+    it "0 -> Int -> Int -> Int (invalid input)" $
+      ["2", "abc", "5", "12", "0", "11"] #-> pReplFold' @Int ">" 0 (+) 0
+        ->># [">2", ">Invalid input", ">7", ">19"]
+    it "sums of squares (stopped)" $
+      ["2", "5", "12", "0", "11"] #-> pReplFold' @Int ">" 0 (flip ((+) . (^ (2 :: Int)))) 0
+        ->># [">4", ">29", ">173"]
 
 (#->) :: [String] -> IO () -> IO ()
 (#->) = withStdin . pack . unlines
 
 (->#) :: IO () -> [String] -> Expectation
-testedIO -># expected = capture_ testedIO `shouldReturn` unlines expected
+testIO -># expected = capture_ testIO `shouldReturn` unlines expected
+
+(->>#) :: IO () -> [String] -> Expectation
+testIO ->># expected = capture_ testIO `shouldReturn` ((++ ">") . unlines) expected
 
 doubleString :: String -> String
 doubleString s = s ++ s
