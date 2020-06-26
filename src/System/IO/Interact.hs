@@ -121,7 +121,7 @@ readShowFunc ::
   ((b -> String) -> fb -> fs) ->
   (a -> fb) ->
   (String -> fs)
-readShowFunc pr fm f = maybe (pr invalid) (fm show) . fmap f . readMaybe
+readShowFunc pr fm f = maybe (pr invalid) (fm show . f) . readMaybe
 
 readShow ::
   (Read a, Show b) => (a -> b) -> (String -> String)

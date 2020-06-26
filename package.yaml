@@ -10,6 +10,7 @@ description: |
   .
   Each line you enter is 'read' into the argument type and sent to the function, with the result printed
 
+github: epoberezkin/interact
 homepage: https://github.com/epoberezkin/interact#readme
 license: MIT
 author: Evgeny Poberezkin
